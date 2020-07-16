@@ -1,17 +1,23 @@
-use std::env;
+use std::fs::{canonicalize, read_dir};
 use std::path::{Path, PathBuf};
-use std::process::{Command};
-use std::fs::{read_dir, canonicalize};
 use std::collections::BTreeMap;
+use std::process::Command;
+use structopt::StructOpt;
 
+#[derive(Debug, StructOpt)]
+#[structopt(name = "glc", about = "Good Line Counter")]
+struct Opt {
+    /// Repository URL
+    #[structopt(name = "REPO")]
+    repo_url: Option<String>,
+}
 
 fn main() {
-    let arg1 = env::args().nth(1);
-    let counter : BTreeMap<String, usize>;
-    match arg1 {
-        None => counter = count_dir_lines(Path::new(".")),
-        Some(v) => counter = count_dir_lines(clone_repo(&v).unwrap().as_path())
-    }
+    let opt = Opt::from_args();
+    let counter = match opt.repo_url {
+        None => count_dir_lines(Path::new(".")),
+        Some(v) => count_dir_lines(clone_repo(&v).unwrap().as_path()),
+    };
     for (extension, num_lines) in counter.iter() {
         println!("{} : {}", extension, num_lines);
     }
