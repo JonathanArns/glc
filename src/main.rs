@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::fs::canonicalize;
+use std::fs::{canonicalize, remove_dir_all};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -14,15 +14,22 @@ struct Opt {
     repo_url: Option<String>,
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     let opt = Opt::from_args();
     let counter = match opt.repo_url {
         None => count_repo_lines(Path::new(".")),
-        Some(v) => count_repo_lines(clone_repo(&v).unwrap().as_path()),
+        Some(v) => {
+            let pathbuf = clone_repo(&v).unwrap();
+            let path = pathbuf.as_path();
+            let c = count_repo_lines(path);
+            remove_dir_all(path)?;
+            c
+        }
     };
     for (extension, num_lines) in counter.iter() {
         println!("{} : {}", extension, num_lines);
     }
+    Ok(())
 }
 
 fn clone_repo(repo: &str) -> std::io::Result<PathBuf> {
