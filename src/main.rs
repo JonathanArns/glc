@@ -1,7 +1,9 @@
-use std::fs::{canonicalize, read_dir};
-use std::path::{Path, PathBuf};
 use std::collections::BTreeMap;
+use std::fs::canonicalize;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use ignore::Walk;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -15,8 +17,8 @@ struct Opt {
 fn main() {
     let opt = Opt::from_args();
     let counter = match opt.repo_url {
-        None => count_dir_lines(Path::new(".")),
-        Some(v) => count_dir_lines(clone_repo(&v).unwrap().as_path()),
+        None => count_repo_lines(Path::new(".")),
+        Some(v) => count_repo_lines(clone_repo(&v).unwrap().as_path()),
     };
     for (extension, num_lines) in counter.iter() {
         println!("{} : {}", extension, num_lines);
@@ -33,16 +35,10 @@ fn clone_repo(repo: &str) -> std::io::Result<PathBuf> {
     return canonicalize(Path::new(iter.next_back().unwrap()));
 }
 
-fn count_dir_lines(dir: &Path) -> BTreeMap<String, usize> {
+fn count_repo_lines(dir: &Path) -> BTreeMap<String, usize> {
     let mut counter = BTreeMap::new();
-    for e in read_dir(dir).unwrap() {
-        let entry = e.unwrap();
-        let ft = entry.file_type().unwrap();
-        if ft.is_file() {
-            counter = merge_counters(counter, count_file_lines(entry.path().as_path()));
-        } else if ft.is_dir() {
-            counter = merge_counters(counter, count_dir_lines(entry.path().as_path()));
-        }
+    for file in Walk::new(dir) {
+        counter = merge_counters(counter, count_file_lines(file.unwrap().path()));
     }
     return counter;
 }
@@ -54,19 +50,28 @@ fn count_file_lines(file: &Path) -> BTreeMap<String, usize> {
         Err(_) => return res,
         Ok(v) => match file.extension() {
             None => return res,
-            Some(ext) => res.insert(ext.to_string_lossy().to_mut().to_string(), v.lines().count())
-        } 
+            Some(ext) => res.insert(
+                ext.to_string_lossy().to_mut().to_string(),
+                v.lines().count(),
+            ),
+        },
     };
     return res;
 }
 
-fn merge_counters(a: BTreeMap<String, usize>, b: BTreeMap<String, usize>) -> BTreeMap<String, usize> {
+fn merge_counters(
+    a: BTreeMap<String, usize>,
+    b: BTreeMap<String, usize>,
+) -> BTreeMap<String, usize> {
     let mut res = BTreeMap::new();
     for (key, val) in a.iter().chain(b.iter()) {
-        res.insert(key.to_string(), match res.get(key) {
-            None => *val,
-            Some(v) => val + v
-        });
+        res.insert(
+            key.to_string(),
+            match res.get(key) {
+                None => *val,
+                Some(v) => val + v,
+            },
+        );
     }
     return res;
 }
