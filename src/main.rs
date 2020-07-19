@@ -62,11 +62,11 @@ fn count_file_lines(file: &Path) -> BTreeMap<String, usize> {
 
 fn merge_counters(a: BTreeMap<String, usize>, b: BTreeMap<String, usize>) -> BTreeMap<String, usize> {
     let mut res = BTreeMap::new();
-    for (key, val) in a.iter() {
-        match b.get(key) {
-            None => res.insert(key.to_string(), *val),
-            Some(v) => res.insert(key.to_string(), val + v)
-        };
+    for (key, val) in a.iter().chain(b.iter()) {
+        res.insert(key.to_string(), match res.get(key) {
+            None => *val,
+            Some(v) => val + v
+        });
     }
     return res;
 }
